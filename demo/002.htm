@@ -1,0 +1,276 @@
+<!DOCTYPE html><html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>貪吃蛇小遊戲</title>
+    <style>
+		button {
+		  width: 100px;
+		  height: 40px;
+		  font-weight: bold;
+		}
+		#game_title {
+		  margin-left: 95px;
+		}
+		#canvas {
+		  border: 1px solid #000000; /* 設定邊框線 */
+		}
+		#score {
+		  font-weight: bold;
+		}
+		#mode_form {
+		  font-weight: bold;
+		}
+		#game_over {
+		  display: none; /* 設定game over 視窗不可見 */
+		 
+		  width: 280px;
+		  height: 160px;
+		  border: 1px solid #000; /* 設定邊框線 */
+		}
+		#btn_replay {}
+		#btn_cancel {}
+    </style>
+  </head>
+  <body>
+   
+    <canvas id="canvas" width="400" height="400"></canvas>
+	<p id="game_over">
+		<h3>遊戲結束！</h3>
+		<h3 id="game_over_score">您的最終得分為: 0分</h3>
+		<button id="btn_replay">PLAY</button>
+		<button id="btn_cancel">取消</button>
+	</p>
+	
+	
+    
+    <p id="score">目前得分: 0分</p>
+    <form action="" id="mode_form">
+      難度等級: 
+      <input type="radio" name="mode" id="simply" value="simply" checked />
+      <label for="simply">簡單</label>
+      <input type="radio" name="mode" id="middle" value="middle" />
+      <label for="middle">中級</label>
+      <input type="radio" name="mode" id="hard" value="hard" />
+      <label for="hard">困難</label>
+    </form>
+    <br />
+    <button id="startButton">開始 / 繼續</button>
+    <button id="pauseButton">暫停</button>
+    <button id="restartButton">重新開始</button>
+
+    <script>
+		const canvas = document.getElementById("canvas");
+		const ctx = canvas.getContext("2d");
+
+		const start_btn = document.getElementById("startButton");
+		const pause_btn = document.getElementById("pauseButton");
+		const restart_btn = document.getElementById("restartButton");
+		const btn_replay_btn = document.getElementById("btn_replay");
+		const cancel_btn = document.getElementById("btn_cancel");
+		const game_over_p = document.getElementById("game_over");
+		const game_over_score = document.getElementById("game_over_score");
+
+		const score_cal = document.getElementById("score");
+		const mode_item = document.getElementsByName("mode");
+
+		// 用重新整理間隔代表蛇的速度，重新整理間隔越長，則蛇的速度越慢
+		// const simply_mode = 200;
+		// const middle_mode = 100;
+		// const hard_mode = 50;
+
+		//注意要改為var const是不會修改的
+		var snake = [41, 40]; // 蛇身體佇列
+		var direction = 1; // 方向：1為向右，-1為向左，20為向下，-20為向上
+		var food = 42; // 食物位置，取值為0~399
+		var n; // 蛇的下一步的方向（由鍵盤和蛇的原方向決定）
+		var score = -1; // 得分
+		var time_internal = 500; //蛇的速度
+
+		let enabled = true; // 用於控制是否重新整理，實現通過一定頻率重新整理
+		let run_id; // 請求ID，用於暫停功能
+
+		// 產生min~max的隨機整數，用於隨機產生食物的位置
+		function random(min, max) {
+			const num = Math.floor(Math.random() * (max - min)) + min;
+			return num;
+		}
+
+		// 用於繪製蛇或者是食物代表的方塊，seat為方塊位置，取值為0~399，color為顏色
+		function draw(seat, color) {
+			ctx.fillStyle = color; // 填充顏色
+			// fillRect的四個引數分別表示要繪製方塊的x座標，y座標，長，寬，這裡為了美觀留了1px用於邊框
+			ctx.fillRect(
+				(seat % 20) * 20 + 1,
+				Math.floor(seat / 20) * 20 + 1,
+				18,
+				18
+			);
+		}
+
+		// // 同步難度等級
+		// function syncMode() {
+		// 	var mode_value = "";
+		// 	for (var i = 0; i < mode_item.length; i++) {
+		// 		if (mode_item[i].checked) {
+		// 			mode_value = mode_item[i].value;//原來是mode_item.value
+		// 		}
+		// 	}
+		// 	switch (mode_value) {
+		// 		case "simply":
+		// 			time_internal = simply_mode;
+		// 			break;
+		// 		case "middle":
+		// 			time_internal = middle_mode;
+		// 			break;
+		// 		case "hard":
+		// 			time_internal = hard_mode;
+		// 			break;
+		// 	}
+		// }
+
+		// 用於繫結鍵盤上下左右事件，我設定了wsad，或者ijkl，或者上下左右方向鍵，代表上下左右方向
+		// 同時繫結R 重新啟動，P 暫停，C 繼續，注意：若是這幾個鍵則不需要更新direction的值，操作結束後直接返回即可
+		document.onkeydown = function (event) {
+			const keycode = event.keyCode;
+			if(keycode == 82){
+				// R 重新啟動
+				restart_btn.onclick();
+				return;
+			} else if(keycode == 80){
+				// P 暫停
+				pause_btn.onclick();
+				return;
+			} else if(keycode == 67){
+				// C 繼續
+				start_btn.onclick();
+				return;
+			} else if (keycode <= 40) {
+				// 上 38 下 40 左 37 右 39
+				n = [-1, -20, 1, 20][keycode - 37] || direction; // 若keycode為其他值，則方向不變
+			} else if (keycode <= 76 && keycode >= 73) {
+				// i 73 j 74 k 75 l 76
+				n = [-20, -1, 20, 1][keycode - 73] || direction;
+			} else {
+				switch (keycode) {
+					case 87: //w
+						n = -20;
+						break;
+					case 83: //s
+						n = 20;
+						break;
+					case 65: //a
+						n = -1;
+						break;
+					case 68: //d
+						n = 1;
+						break;
+					default:
+						n = direction;
+				}
+			}
+			direction = snake[1] - snake[0] == n ? direction : n; // 若方向與原方向相反，則方向不變
+		};
+
+		// 用於初始化遊戲各項引數
+		function init_game() {
+			snake = [41, 40]; 
+			direction = 1; 
+			food = 42;
+			score = -1; 
+			time_internal = 500;
+			enabled = true;
+			score_cal.innerText = "目前得分: 0分"; // 更新得分
+			mode_item[0].checked = true; // 重置難度等級為簡單
+		}
+
+		function game_over(){
+			cancelAnimationFrame(run_id);
+			game_over_score.innerText = "您的最終得分為: " + score + "分";
+			game_over_p.style.display = "block";
+		}
+
+		// 啟動或繼續遊戲
+		function run_game() {
+			//syncMode(); // 同步難度等級
+			n = snake[0] + direction; // 找到新蛇頭座標
+			snake.unshift(n); // 新增新蛇頭
+			// 判斷蛇頭是否撞到自己或者是否超出邊界
+			if (
+				snake.indexOf(n, 1) > 0 ||
+				n < 0 ||
+				n > 399 ||
+				(direction == 1 && n % 20 == 0) ||
+				(direction == -1 && n % 20 == 19)
+			) {
+				game_over();
+			}
+			draw(n, "#1a8dcc"); // 繪製新蛇頭為淺藍色
+			draw(snake[1], "#cececc"); // 將原來的蛇頭（淺藍色）變成蛇身（淺灰色）
+			if (n == food) {
+				score = score + 1;
+				score_cal.innerText = "目前得分: " + score; // 更新得分
+				while (snake.indexOf((food = random(0, 400))) >= 0); // 重新重新整理食物，注意食物應不在蛇內部
+				draw(food, "Yellow"); // 繪製食物
+			} else {
+				draw(snake.pop(), "White"); // 將原來的蛇尾繪製成白色
+			}
+			// setTimeout(arguments.callee, time_internal); //之前的方案，無法實現暫停和遊戲的繼續
+		}
+
+		// 控制遊戲的重新整理頻率,每隔time_internal時間間隔重新整理一次
+		function game_control(){
+			if(enabled){
+				enabled = false;
+				requestAnimationFrame(run_game);
+				setTimeout(() => enabled = true, time_internal);
+			}
+			run_id = requestAnimationFrame(game_control);
+		}
+
+		// 繫結開始按鈕點選事件
+		start_btn.onclick = function () {
+			run_id = requestAnimationFrame(game_control);
+		};
+
+		// 繫結暫停按鈕點選事件
+		pause_btn.onclick = function () {
+			cancelAnimationFrame(run_id);
+		};
+
+		// 繫結重新開始按鈕點選事件
+		restart_btn.onclick = function () {
+			cancelAnimationFrame(run_id);
+			// 將原有的食物和蛇的方塊都繪製成白色
+			for(var i = 0; i < snake.length; i++){
+				draw(snake[i], "White");
+			}
+			draw(food, "White");
+			// 初始化遊戲各項引數
+			init_game();
+			run_id = requestAnimationFrame(game_control);			
+		};
+
+		// 繫結遊戲結束時的取消按鈕點選事件
+		cancel_btn.onclick = function () {
+			for(var i = 0; i < snake.length; i++){
+				draw(snake[i], "White");
+			}
+			draw(food, "White");
+			init_game();
+			game_over_p.style.display = "none";
+		}
+
+		// 繫結遊戲結束時的再來一把按鈕點選事件
+		btn_replay_btn.onclick = function () {
+			for(var i = 0; i < snake.length; i++){
+				draw(snake[i], "White");
+			}
+			draw(food, "White");
+			init_game();
+			game_over_p.style.display = "none";
+			run_id = requestAnimationFrame(game_control);
+		}
+    </script>
+  </body></html>

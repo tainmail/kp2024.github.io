@@ -1,0 +1,295 @@
+<!DOCTYPE html><html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	
+	<meta name="viewport" content="width=400,minimum-scale=0.5,maximum-scale=0.8">
+	<link rel="shortcut icon" href="#"/>
+    <title>貪吃蛇小遊戲</title>
+	<style>
+	@import url(https://fonts.googleapis.com/earlyaccess/notosanstc.css);
+	*{font-family:'Noto Sans TC','微軟正黑體';}
+	*,*::before,*::after{margin:0px; padding:0px; -webkit-box-sizing:border-box; -moz-box-sizing:border-box; box-sizing:border-box;}
+	.clearfix:after{content:''; display:block; height:0; clear:both; visibility:hidden;}
+	hr{margin:20px 0px;}
+	pre{border:2px solid deeppink; padding:5px; margin:2px; font-size:12px; background:rgba(255,255,255,0.7); clear:both; font-size:12px; font-family:'Source Code Pro';}
+	pre strong{color:#c00;}
+	pre em{font-style:normal; font-weight:bold; color:#006600;}
+	*[class^=btn]{ padding:5px 10px; margin:3px; background-color:gold; border-radius:4px; border:2px solid #333; }
+	.wrapper{ width:400px; margin:0 auto; border:2px solid #333;}
+
+	.dialog{ border:2px solid red; }
+	
+	</style>
+   
+  </head>
+  <body>
+
+	<!--wrapper 開始-->
+	<div class="wrapper">
+
+		<!--game 開始-->
+		<div class="game">
+			<canvas id="canvas" width="400" height="400"></canvas>
+		</div>
+		<!--game 結束-->
+
+		<!--dashboard 開始-->
+		<div class="dashboard">
+			<p class="score_current"> 目前跟隨 <span>--</span>株小草</p>
+			<!--menu 開始-->
+			<div class="menu">
+				<button class="btn_top">↑</button>
+				<button class="btn_right">→</button>
+				<button class="btn_bottom">↓</button>
+				<button class="btn_left"> ←</button>
+				  
+			</div>
+			<!--menu 結束-->
+		</div>
+		<!--dashboard 結束-->
+
+
+	</div>
+	<!--wrapper 結束-->
+
+	<!--dialog_intro 開始-->
+	<div class="dialog dialog_intro">
+		<!--inner 開始-->
+		<div class="inner">
+			<h3>扛阿伯!送進總統府!</h3>
+			<p><img src="https://fakeimg.pl/200x200/959/fff?font=noto&text=示意圖"></p>
+			<p>1. 點按鈕或鍵盤↑ ↓ ← →，控制阿伯的方向，尋找小草。</p>
+			<p>2. 不能碰牆，不能碰到跟隨中的小草。</p>
+			<button id="btn_play">開始</button>
+		</div>
+		<!--inner 結束-->
+	</div>
+	<!--dialog_intro 結束-->
+
+	<!--dialog_over 開始-->
+	<div class="dialog dialog_over">
+		<!--inner 開始-->
+		<div class="inner">
+			<h3>凍蒜！</h3>
+			
+			<p class="score_final"><span>--</span>株小草扛阿伯!進總統府!</p>
+			<button id="btn_reload">義無反顧，再拼一次</button>
+			
+		</div>
+		<!--inner 結束-->
+	</div>
+	<!--dialog_over 結束-->
+   
+
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.3/jquery.js"></script>
+	
+	<script>
+	$(function(){
+
+		// 蛇身體佇列
+		var snake = [40, 40]; 
+		var direction = 1; // 方向：1為向右，-1為向左，20為向下，-20為向上
+		var food = 40; // 食物位置，取值為0~399
+		var nextDir; // 蛇下一步方向
+		var score = 2; // 得分
+		var speed = 500; //蛇的速度
+
+		let enabled = true; // 用於控制是否重新整理，實現通過一定頻率重新整理
+		let rafId; // raf
+
+
+		const canvas = document.getElementById("canvas");
+		const ctx = canvas.getContext("2d");
+
+		
+
+		
+
+		// 產生min~max的隨機整數，用於隨機產生食物的位置
+		function random(min, max) {
+			const num = Math.floor(Math.random() * (max - min)) + min;
+			return num;
+		}
+
+		let imgHead = null;
+		let imgBody = null;
+		let imgFood = null;
+
+		//重繪 方塊 
+		function fnDraw(seat, color, part) {
+
+			switch (part) {
+				case "頭部":
+					if (imgHead === null) {
+						imgHead = new Image();
+						imgHead.src = "images/snack_head.png";
+						imgHead.onload = function(){
+							ctx.drawImage(imgHead, (seat % 40) * 40, Math.floor(seat / 40) * 40, 40, 40);
+						};
+					} else {
+						ctx.drawImage(imgHead, (seat % 40) * 40, Math.floor(seat / 40) * 40, 40, 40);
+					}
+					break;
+				case "身體":
+					if (imgBody === null) {
+						imgBody = new Image();
+						imgBody.src = "images/snack_body.png";
+						imgBody.onload = function(){
+							ctx.drawImage(imgBody, (seat % 40) * 40, Math.floor(seat / 40) * 40, 40, 40);
+						};
+					} else {
+						ctx.drawImage(imgBody, (seat % 40) * 40, Math.floor(seat / 40) * 40, 40, 40);
+					}
+					break;
+				case "食物":
+					if (imgFood === null) {
+						
+						imgFood = new Image();
+						imgFood.src = "images/snack_food.png";
+						imgFood.onload = function(){
+							ctx.drawImage(imgFood, (seat % 40) * 40, Math.floor(seat / 40) * 40, 40, 40);
+						};
+					} else {
+						console.log("食2");
+						ctx.drawImage(imgFood, (seat % 40) * 40, Math.floor(seat / 40) * 40, 40, 40);
+					}
+					break;
+				case "空白":
+					ctx.fillStyle = color; // 填充顏色
+					ctx.fillRect(
+						(seat % 40) * 40,
+						Math.floor(seat / 40) * 40,
+						40,
+						40
+					);
+				break;
+				default:
+					break;
+			}
+		}
+
+	
+		//鍵盤 上下左右
+		$(document).on("keydown", function(e){
+			e.preventDefault();
+			const keycode = event.keyCode;
+			switch (keycode) {
+				case 38: // 上箭頭
+					$(".btn_top").trigger("click");
+					break;
+				case 39: // 右箭頭
+					$(".btn_right").trigger("click");
+					break;
+				case 40: // 下箭頭
+					$(".btn_bottom").trigger("click");
+					break;
+				case 37: // 左箭頭
+					$(".btn_left").trigger("click");
+					break;
+				default:
+					break;
+			}
+		});
+
+		
+		//按鈕 上下左右
+		$(".btn_top").on("click", function(){
+			direction = direction === 40 ? direction : -40;
+		});
+
+		$(".btn_right").on("click", function(){
+			direction = direction === -1 ? direction : 1;
+		});
+
+		$(".btn_bottom").on("click", function(){
+			direction = direction === -40 ? direction : 40;
+		});
+
+		$(".btn_left").on("click", function(){
+			direction = direction === 1 ? direction : -1;
+		});
+
+
+
+		//更新分數
+		function fnScore(){
+			$(".score_current, .score_final").find("span").text(score);
+		}
+
+		//遊戲結束
+		function fnGameOver(){
+			console.log("GameOver");
+			cancelAnimationFrame(rafId);
+		}
+
+		//蛇 走
+		function fnSnakeRun() {
+			//蛇頭座標
+			nextDir = snake[0] + direction;
+
+			//蛇頭 新增
+			snake.unshift(nextDir); 
+			
+			// 蛇頭 出邊界 撞到自己
+			if (
+				snake.indexOf(nextDir, 1) > 0 ||
+				nextDir < 0 ||
+				nextDir > 399 ||
+				(direction == 1 && nextDir % 40 == 0) ||
+				(direction == -1 && nextDir % 40 == 39)
+			) {
+				fnGameOver();
+			}
+			fnDraw(nextDir, "#00f", "頭部"); // 重繪 蛇頭
+			fnDraw(snake[1], "#0f0", "身體"); // 重繪 蛇身（淺灰色）
+			if (nextDir == food) {
+				score++;
+
+				//加速
+				if(score===5){
+					speed = 400;
+				}else if(score===10){
+					speed = 300;
+				}else if(score===20){
+					speed = 200;
+				}else if(score===30){
+					speed = 100;
+				}
+
+				fnScore();
+				while (snake.indexOf((food = random(0, 400))) >= 0); // 重新重新整理食物，注意食物應不在蛇內部
+				fnDraw(food, "Yellow", "食物"); // 繪製食物
+			} else {
+				fnDraw(snake.pop(), "White", "空白"); // 將原來的蛇尾繪製成白色
+			}
+			
+		}
+
+		//重新整理頻率
+		function fnFrame(){
+			if(enabled){
+				enabled = false;
+				requestAnimationFrame(fnSnakeRun);
+				setTimeout(() => enabled = true, speed);
+			}
+			rafId = requestAnimationFrame(fnFrame);
+		}
+
+		// 按鈕 開始
+		$("#btn_play").on("click", function(){
+			rafId = requestAnimationFrame(fnFrame);
+		});
+
+	
+		//按鈕 重玩
+		$("#btn_reload").on("click", function(){
+			location.reload();
+		});
+
+		
+	});
+	</script>
+
+   
+  </body></html>
